@@ -1,0 +1,5 @@
+package maglibs
+
+sourcedir = "."
+
+depends = contrib
