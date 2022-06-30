@@ -40,16 +40,16 @@ OrdPrf LT = LT
 OrdPrf EQ = Equal
 OrdPrf GT = GT
 
-ordPrfSucc : DPair Ordering (\o => OrdPrf o a b) ->
-             DPair Ordering (\o => OrdPrf o (S a) (S b))
-ordPrfSucc (MkDPair LT p) = MkDPair LT (LTESucc p)
-ordPrfSucc (MkDPair EQ p) = MkDPair EQ (cong S p)
-ordPrfSucc (MkDPair GT p) = MkDPair GT (LTESucc p)
+ordPrfSucc : Subset Ordering (\o => OrdPrf o a b) ->
+             Subset Ordering (\o => OrdPrf o (S a) (S b))
+ordPrfSucc (Element LT p) = Element LT (LTESucc p)
+ordPrfSucc (Element EQ p) = Element EQ (cong S p)
+ordPrfSucc (Element GT p) = Element GT (LTESucc p)
 
-compareWithProof : (a, b : Nat) -> DPair Ordering (\o => OrdPrf o a b)
-compareWithProof      0      0 = MkDPair EQ Refl
-compareWithProof      0 (S b') = MkDPair LT ltZero
-compareWithProof (S a')      0 = MkDPair GT ltZero
+compareWithProof : (a, b : Nat) -> Subset Ordering (\o => OrdPrf o a b)
+compareWithProof      0      0 = Element EQ Refl
+compareWithProof      0 (S b') = Element LT ltZero
+compareWithProof (S a')      0 = Element GT ltZero
 compareWithProof (S a') (S b') = ordPrfSucc $ compareWithProof a' b'
 
 record SubProofs a b x where
@@ -60,12 +60,12 @@ record SubProofs a b x where
   xNZ   : LT b a -> NonZero x
   bLTa  : NonZero x -> LT b a
 
-subWithProofs : (a, b : Nat) -> (0 _ : LTE b a) -> DPair Nat (SubProofs a b)
+subWithProofs : (a, b : Nat) -> (0 _ : LTE b a) -> Subset Nat (SubProofs a b)
 subWithProofs a 0 bLTEa =
-  MkDPair a (SP reflexive absurd absurd gtMeansNZ nzMeansGT)
+  Element a (SP reflexive absurd absurd gtMeansNZ nzMeansGT)
 subWithProofs (S a') (S b') bLTEa =
   case subWithProofs a' b' (fromLteSucc bLTEa) of
-       MkDPair x proofs => MkDPair x (SP (lteSuccRight proofs.xLTEa)
+       Element x proofs => Element x (SP (lteSuccRight proofs.xLTEa)
                                          (\_ => LTESucc proofs.xLTEa)
                                          (\_ => SIsNonZero)
                                          (proofs.xNZ . fromLteSucc)
@@ -87,13 +87,13 @@ record GCDSubResult a b where
   constructor GCDSR
   x : Nat
   y : Nat
-  proofs : GCDSubProofs a b x y
+  0 proofs : GCDSubProofs a b x y
 
-gcdSub : (a, b : Nat) -> LTE b a -> GCDSubResult a b
+gcdSub : (a, b : Nat) -> (0 _ : LTE b a) -> GCDSubResult a b
 gcdSub a b bLTEa =
-  let MkDPair c proofs = subWithProofs a b bLTEa in
+  let Element c proofs = subWithProofs a b bLTEa in
       case compareWithProof b c of
-           MkDPair LT bLTc => GCDSR c b (GCDSP (lteSuccLeft bLTc)
+           Element LT bLTc => GCDSR c b (GCDSP (lteSuccLeft bLTc)
                                                proofs.xLTEa
                                                reflexive
                                                proofs.xNZ
@@ -102,7 +102,7 @@ gcdSub a b bLTEa =
                                                const
                                                (\bNZ, _ => proofs.xLTa bNZ)
                                                )
-           MkDPair EQ bEQc => GCDSR c b (GCDSP (equalMeansLTE bEQc)
+           Element EQ bEQc => GCDSR c b (GCDSP (equalMeansLTE bEQc)
                                                proofs.xLTEa
                                                reflexive
                                                proofs.xNZ
@@ -111,7 +111,7 @@ gcdSub a b bLTEa =
                                                const
                                                (\bNZ, _ => proofs.xLTa bNZ)
                                                )
-           MkDPair GT bGTc => GCDSR b c (GCDSP (lteSuccLeft bGTc)
+           Element GT bGTc => GCDSR b c (GCDSP (lteSuccLeft bGTc)
                                                bLTEa
                                                (lteSuccLeft bGTc)
                                                (\_ => gtMeansNZ bGTc)
@@ -121,17 +121,20 @@ gcdSub a b bLTEa =
                                                (\_ => id)
                                                )
 
-gcd : (a, b : Nat) -> LTE b a -> NonZero b -> Nat
-gcd a b bLTEa bNZ with (sizeAccessible (a, b))
-  gcd 0 (S _) bLTEa _ | _ = absurd0 bLTEa
-  gcd (S a') (S b') bLTEa bNZ | Access rec =
+gcd : (a, b : Nat) ->
+      {auto 0 bLTEa : LTE b a} ->
+      {auto 0 bNZ : NonZero b} ->
+      Nat
+gcd a b {bLTEa} {bNZ} with 0 (sizeAccessible (a, b))
+  gcd 0 (S _) | _ = absurd0 bLTEa
+  gcd (S a') (S b') {bLTEa} {bNZ} | Access rec =
     case compareWithProof (S a') (S b') of
-         MkDPair LT aLTb => void (LTImpliesNotGTE aLTb bLTEa)
-         MkDPair EQ    _ => S a'
-         MkDPair GT aGTb => let
+         Element LT aLTb => void (LTImpliesNotGTE aLTb bLTEa)
+         Element EQ    _ => S a'
+         Element GT aGTb => let
            GCDSR x y proofs = gcdSub (S a') (S b') bLTEa
-           yLTEx = proofs.xGTEy
-           yNZ = proofs.yNZ bNZ aGTb
-           xLTa' = proofs.xLTa bNZ aGTb
-           accProof = ltSums xLTa' proofs.yLTEb
-           in gcd x y yLTEx yNZ | rec (x, y) accProof
+           0 yLTEx = proofs.xGTEy
+           0 yNZ = proofs.yNZ bNZ aGTb
+           0 xLTa' = proofs.xLTa bNZ aGTb
+           0 accProof = ltSums xLTa' proofs.yLTEb
+           in gcd x y {bLTEa = yLTEx} {bNZ = yNZ} | rec (x, y) accProof
