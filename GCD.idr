@@ -1,121 +1,137 @@
 module GCD
 
 import Control.WellFounded
+import Data.DPair
 import Data.Nat
 
-import Compare
-import Minus
+%default total
 
-data Gwog = MkG Nat Nat
+Uninhabited (LT n n) where
+  uninhabited (LTESucc x) = uninhabited x
 
-Sized Gwog where
-  size (MkG x y) = 4 * x + y
+gtMeansNZ : forall b . GT a b -> NonZero a
+gtMeansNZ (LTESucc _) = SIsNonZero
 
-gwehd : (k : Nat) ->
-        ((y : Gwog) ->
-          LT (size y) (S ((k + (3 * S k)) + 0)) ->
-          Accessible (\x, y => LT (size x) (size y)) y) ->
-        LT (4 * k + 3) (S ((k + (3 * S k)) + 0))
-gwehd 0 f = LTESucc (LTESucc (LTESucc (LTESucc LTEZero)))
-gwehd (S k) f = ?geewfg
+nzMeansGT : NonZero a -> GT a Z
+nzMeansGT SIsNonZero = LTESucc LTEZero
 
-total
-gwog : Nat -> Nat -> ()
-gwog k j with (sizeAccessible (MkG k j))
-  gwog 0 0 | Access rec = ()
-  gwog (S k) 0 | Access rec = gwog k 3 | rec (MkG k 3) (gwehd k rec)
-  gwog k (S j) | Access rec = gwog k j | rec (MkG k j) ?gweh
+equalMeansLTE : {a : Nat} -> a = b -> LTE a b
+equalMeansLTE {a = 0}   Refl = LTEZero
+equalMeansLTE {a = S _} Refl = LTESucc (equalMeansLTE Refl)
 
-data Hmm = One | Two
+replace : {0 p : _ -> Type} -> a = b -> p a -> p b
+replace Refl x = x
 
-Sized Hmm where
-  size One = 1
-  size Two = 2
+absurd0 : Uninhabited t => (0 _ : t) -> a
+absurd0 x = void $ uninhabited x
 
--- total
-hmm' : Hmm -> ()
-hmm' One = ()
-hmm' Two = hmm' One
+lteAddRight : {c : Nat} -> LTE a b -> LTE a (c + b)
+lteAddRight LTEZero = LTEZero
+lteAddRight {c = 0} x = x
+lteAddRight {c = (S c')} (LTESucc x) = LTESucc (lteAddRight $ lteSuccRight x)
 
-total
-hmm : Hmm -> ()
-hmm x with (sizeAccessible x)
-  hmm One | Access rec = ()
-  hmm Two | Access rec = hmm One | rec One reflexive
+ltSums : {c : Nat} -> LTE a c -> LTE b d -> LTE (a + b) (c + d)
+ltSums LTEZero LTEZero = LTEZero
+ltSums LTEZero (LTESucc x) = lteAddRight (LTESucc x)
+ltSums (LTESucc x) y = LTESucc (ltSums x y)
 
-total
-hmmm : Hmm -> Hmm -> ()
-hmmm x y with (sizeAccessible (x, y))
-  hmmm One One | Access rec = ()
-  hmmm One Two | Access rec = hmmm One One | rec (One, One) reflexive
-  hmmm Two One | Access rec = hmmm One Two | rec (One, Two) ?gewh
-  hmmm Two Two | Access rec = hmmm Two One | rec (Two, One) ?gerh
+OrdPrf : Ordering -> (Nat -> Nat -> Type)
+OrdPrf LT = LT
+OrdPrf EQ = Equal
+OrdPrf GT = GT
 
-total
-jgjj : (a, b : Nat) -> LTE (S (a + b)) (a + (S b))
-jgjj 0 0 = LTESucc LTEZero
-jgjj 0 (S k) = reflexive
-jgjj (S k) 0 = LTESucc (jgjj k 0)
-jgjj (S k) (S j) = LTESucc (jgjj k (S j))
+ordPrfSucc : DPair Ordering (\o => OrdPrf o a b) ->
+             DPair Ordering (\o => OrdPrf o (S a) (S b))
+ordPrfSucc (MkDPair LT p) = MkDPair LT (LTESucc p)
+ordPrfSucc (MkDPair EQ p) = MkDPair EQ (cong S p)
+ordPrfSucc (MkDPair GT p) = MkDPair GT (LTESucc p)
 
-gjk : (a : Nat) -> LTE a (S a)
-gjk 0 = LTEZero
-gjk (S k) = LTESucc (gjk k)
+compareWithProof : (a, b : Nat) -> DPair Ordering (\o => OrdPrf o a b)
+compareWithProof      0      0 = MkDPair EQ Refl
+compareWithProof      0 (S b') = MkDPair LT ltZero
+compareWithProof (S a')      0 = MkDPair GT ltZero
+compareWithProof (S a') (S b') = ordPrfSucc $ compareWithProof a' b'
 
-gegl : (a, b : Nat) -> LTE (S a + b) (a + S (S b))
-gegl 0 0 = LTESucc LTEZero
-gegl 0 (S k) = gjk (S (S k))
-gegl (S k) b = LTESucc (gegl k b)
+record SubProofs a b x where
+  constructor SP
+  xLTEa : LTE x a
+  xLTa  : NonZero b -> LT x a
+  bNZ   : LT x a -> NonZero b
+  xNZ   : LT b a -> NonZero x
+  bLTa  : NonZero x -> LT b a
 
-p0 : (x : Nat) -> x + 0 = x
-p0 0 = Refl
-p0 (S k) = cong S (p0 k)
+subWithProofs : (a, b : Nat) -> (0 _ : LTE b a) -> DPair Nat (SubProofs a b)
+subWithProofs a 0 bLTEa =
+  MkDPair a (SP reflexive absurd absurd gtMeansNZ nzMeansGT)
+subWithProofs (S a') (S b') bLTEa =
+  case subWithProofs a' b' (fromLteSucc bLTEa) of
+       MkDPair x proofs => MkDPair x (SP (lteSuccRight proofs.xLTEa)
+                                         (\_ => LTESucc proofs.xLTEa)
+                                         (\_ => SIsNonZero)
+                                         (proofs.xNZ . fromLteSucc)
+                                         (LTESucc . proofs.bLTa)
+                                         )
 
-sj : (x : Nat) -> LTE x (S x)
+record GCDSubProofs a b x y where
+  constructor GCDSP
+  xGTEy : GTE x y
+  xLTEa : LTE x a
+  yLTEb : LTE y b
+  xNZ   : LT b a -> NonZero x
+  yLTa  : LT b a -> LT y a
+  xNZ'  : NonZero b -> NonZero x
+  yNZ   : NonZero b -> LT b a -> NonZero y
+  xLTa  : NonZero b -> LT b a -> LT x a
 
-pggg : (x, a, b : Nat) -> LTE (x + a) (x + b) -> LTE a b
-pggg 0 0 0 LTEZero = LTEZero
-pggg 0 0 (S k) LTEZero = LTEZero
-pggg 0 (S k) (S j) y = y
-pggg (S k) 0 0 (LTESucc x) = LTEZero
-pggg (S k) 0 (S j) (LTESucc x) = LTEZero
-pggg (S k) (S j) 0 (LTESucc x) = (pggg k (S j) 0 x)
-pggg (S k) (S j) (S i) (LTESucc x) = pggg k (S j) (S i) x
+record GCDSubResult a b where
+  constructor GCDSR
+  x : Nat
+  y : Nat
+  proofs : GCDSubProofs a b x y
 
-gggp : (x, a, b : Nat) -> LTE a b -> LTE (x + a) (x + b)
-gggp 0 a b y = y
-gggp (S k) 0 b y = LTESucc (gggp k 0 b y)
-gggp (S k) (S j) 0 y = LTESucc (gggp k (S j) 0 y)
-gggp (S k) (S j) (S i) y = LTESucc (gggp k (S j) (S i) y)
+gcdSub : (a, b : Nat) -> LTE b a -> GCDSubResult a b
+gcdSub a b bLTEa =
+  let MkDPair c proofs = subWithProofs a b bLTEa in
+      case compareWithProof b c of
+           MkDPair LT bLTc => GCDSR c b (GCDSP (lteSuccLeft bLTc)
+                                               proofs.xLTEa
+                                               reflexive
+                                               proofs.xNZ
+                                               id
+                                               (\_ => gtMeansNZ bLTc)
+                                               const
+                                               (\bNZ, _ => proofs.xLTa bNZ)
+                                               )
+           MkDPair EQ bEQc => GCDSR c b (GCDSP (equalMeansLTE bEQc)
+                                               proofs.xLTEa
+                                               reflexive
+                                               proofs.xNZ
+                                               id
+                                               (replace bEQc {p = NonZero})
+                                               const
+                                               (\bNZ, _ => proofs.xLTa bNZ)
+                                               )
+           MkDPair GT bGTc => GCDSR b c (GCDSP (lteSuccLeft bGTc)
+                                               bLTEa
+                                               (lteSuccLeft bGTc)
+                                               (\_ => gtMeansNZ bGTc)
+                                               (transitive (lteSuccRight bGTc))
+                                               id
+                                               (\_ => proofs.xNZ)
+                                               (\_ => id)
+                                               )
 
-jll : (a, b : Nat) -> LTE (S (S a)) b -> LTE a b
-jll 0 b x = LTEZero
-jll (S k) (S _) (LTESucc x) = LTESucc (jll k _ x)
-
-gewg' : {a, b, n : Nat} ->
-        LTE b a ->
-        LT n (S (S a)) ->
-        LT n (S left) ->
-        LTE (S (S (S a + n))) (S (S a + (S b)))
-gewg' _ (LTESucc y) nlta = ?gewg_base -- gewg' u f (LTESucc u) SIsNonZero (LTESucc y)
-gewg' _ (LTESucc z) nlta {a=S right} {b=S left} {n=S x} =
-  LTESucc $ LTESucc $ LTESucc $ rewrite sym $ plusSuccRightSucc right (S left) in 
-    LTESucc $ gggp right (S x) (S left) $ LTESucc $ jll x left ?nlta_aaa
-
-ewgg : (a, b, c : Nat) -> LTE (S (S a + c)) (S (S b + (S a)))
-ewgg 0 _ 0 = LTESucc (LTESucc LTEZero)
-ewgg 0 (S k) (S j) = LTESucc (ewgg 0 k j)
-ewgg a b c = LTESucc $ LTESucc ?gweg
-
-Sized (Nat, Nat, NonZero a, GT b c) where
-  size (x, y, p, q) = size (x, y)
-
-gcd : (a, b : Nat) -> NonZero b -> GT a b -> Nat
-gcd a b x y with (sizeAccessible (a, b, x, y))
-  gcd (S a') (S b') _ (LTESucc x) | Access acc with (x)
-    gcd (S (S a'')) (S b') _ (LTESucc x) | Access acc | LTESucc y =
-      let (n ** (nnz, nlta)) = minusNZLT (S (S a'')) (S b') (LTESucc x) SIsNonZero
-      in case compareWithProof n (S b') of
-              (EQ ** p) => n
-              (LT ** p) => gcd (S b') n nnz p | ?ewug -- acc (S b', n, nnz, p) (ewgg ?a ?b ?c)
-              (GT ** p) => gcd n (S b') SIsNonZero p | ?wafasggerh -- acc (n, S b', SIsNonZero, p) ?fewgdfaf
+gcd : (a, b : Nat) -> LTE b a -> NonZero b -> Nat
+gcd a b bLTEa bNZ with (sizeAccessible (a, b))
+  gcd 0 (S _) bLTEa _ | _ = absurd0 bLTEa
+  gcd (S a') (S b') bLTEa bNZ | Access rec =
+    case compareWithProof (S a') (S b') of
+         MkDPair LT aLTb => void (LTImpliesNotGTE aLTb bLTEa)
+         MkDPair EQ    _ => S a'
+         MkDPair GT aGTb => let
+           GCDSR x y proofs = gcdSub (S a') (S b') bLTEa
+           yLTEx = proofs.xGTEy
+           yNZ = proofs.yNZ bNZ aGTb
+           xLTa' = proofs.xLTa bNZ aGTb
+           accProof = ltSums xLTa' proofs.yLTEb
+           in gcd x y yLTEx yNZ | rec (x, y) accProof
