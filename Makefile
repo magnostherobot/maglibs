@@ -8,4 +8,4 @@ lib%.so : %.c
 	$(CC) -shared -o $@ $^
 
 clean :
-	$(RM) *~ $(TRGT) -r build/
+	$(RM) *.idr~ $(TRGT) *.o *.s *.ll *.bc -r build/

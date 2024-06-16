@@ -87,6 +87,16 @@ newArray : HasIO io => (0 t : Type) -> io $ Arr Z t
 newArray t = do arr <- primIO prim__newArray
                 pure $ recallArrType arr
 
+foldl' : ({n : _} -> Vect n t -> t -> Vect (S n) t) ->
+         Vect j t ->
+         Vect k t ->
+         Vect (j + k) t
+
+test : Vect n a -> Vect n a
+test xs = foldl' (flip (::)) [] xs
+
+toArray'' : HasIO io => Appendable a => Vect n a -> io $ Arr n a
+-- toArray'' xs = foldl' ?gweg ?fewg ?gewg
 
 -- TODO
 appendMany : HasIO io => Appendable t => {n : _} ->
@@ -122,7 +132,7 @@ printArray xs = let xs' = forgetArrType xs
 main : IO ()
 main = do arr <- newArray AnyPtr
           x <- malloc 16
-          arr' <- append arr x
+          arr <- append arr x
           y <- malloc 16
-          arr'' <- append arr' y
+          arr <- append arr y
           printArray arr

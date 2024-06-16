@@ -4,6 +4,20 @@ import Data.Nat
 
 %default total
 
+nzmgtz : NonZero a -> GT a Z
+nzmgtz SIsNonZero = LTESucc LTEZero
+
+gtzmnz : GT a Z -> NonZero a
+gtzmnz (LTESucc x) = SIsNonZero
+
+feg : (a, b : Nat) -> GT a b -> GT b Z -> GT a 1
+feg a 1 p _ = p
+feg (S 0) (S (S k)) x y = ?gh
+feg (S (S j)) (S (S k)) x y = ?feg_rhs_7
+
+partial
+grg : GT a b -> GT b c -> GT a c
+
 public export
 minusNZ : (a, b : Nat) -> GT a b -> (n ** NonZero n)
 minusNZ (S k)     Z _ = ((S k) ** SIsNonZero)

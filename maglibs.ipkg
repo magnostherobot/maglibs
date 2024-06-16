@@ -2,4 +2,4 @@ package maglibs
 
 sourcedir = "."
 
-depends = contrib
+depends = contrib, idris2
